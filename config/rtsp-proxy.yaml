@@ -1,0 +1,58 @@
+#
+# as an example, configuring INPUT for multiple AXIS cameras
+#
+
+# how many video frames to buffer for each camera, and for the RTSP processor
+input_ring_buffer_size: 2
+
+# templated values. to be used when all cameras have the same parameters except for the camera number
+#
+input_rtsp_host_t: "192.168.0.105"
+input_rtsp_port_t: 554
+input_rtsp_user_t: "root"
+input_rtsp_passwd_t: "root"
+input_rtsp_path_t: "/axis-media/media.amp?camera="
+input_rtsp_url_t: "rtsp://{USER}:{PASSWD}@{HOST}:{PORT}{PATH}"
+
+# actual RTSP camera URLS. 
+# The template URL above and URLS below can use following variables
+# configured from input_rtsp_XXX_t values:
+#  {USER} ${PASSWD} ${HOST} ${PORT} ${PATH}
+#
+# the input_rtsp_locations can also use {URL} variable from input_rtsp_url_t value
+#
+input_rtsp_locations_t: [ "{URL}1", "{URL}2", "{URL}3", "{URL}4" ]
+
+# indexed template to use in 'input_gst_rtsp_pipelines' if all pipelines are the same 
+# with exception of the location
+input_gst_rtsp_pipeline_idx_t: >-
+    rtspsrc location={LOCATION} latency=0
+    ! rtph264depay
+    ! h264parse
+    ! decodebin
+    ! videoconvert
+    ! appsink drop=true max-buffers=1
+#//"! video/x-raw,width=%d,height=%d,format=I420,framerate=%d/1 "\
+
+# this is the variable defining how many cameras we are connecting to
+# it can use all templated variables above plus, index dependent, PIPELINE_IDX
+input_gst_rtsp_pipelines: [ "{PIPELINE_IDX}", "{PIPELINE_IDX}", "{PIPELINE_IDX}", "{PIPELINE_IDX}" ]
+
+#
+# Output configuration
+#
+output_fps: 15
+output_width: 5120
+output_height: 720
+output_path: "/be"
+
+output_gst_rtsp_pipeline: >-
+    appsrc name=source format=GST_FORMAT_TIME 
+    caps=video/x-raw,width={OUTPUT_WIDTH},height={OUTPUT_HEIGHT},framerate={OUTPUT_FPS}/1,format=BGR
+    ! videoconvert 
+    ! x264enc speed-preset=ultrafast tune=zerolatency 
+    ! rtph264pay config-interval=1 name=pay0
+
+#// "appsrc name=source is-live=true block=true format=GST_FORMAT_TIME "\
+#// "! rtph264pay config-interval=1 pt=96 name=pay0"
+
